@@ -85,6 +85,21 @@ struct Mat4 {
         mat.m[3][2] = -1.0f;
         return mat;
     }
+
+    static Mat4 lookAt(Vec3 eye, Vec3 target, Vec3 up) {
+        Vec3 f = (target - eye).normalize();
+        Vec3 s = f.cross(up).normalize();
+        Vec3 u = s.cross(f);
+
+        Mat4 mat = identity();
+        mat.m[0][0] = s.x; mat.m[0][1] = s.y; mat.m[0][2] = s.z;
+        mat.m[1][0] = u.x; mat.m[1][1] = u.y; mat.m[1][2] = u.z;
+        mat.m[2][0] = -f.x; mat.m[2][1] = -f.y; mat.m[2][2] = -f.z;
+        mat.m[0][3] = -s.dot(eye);
+        mat.m[1][3] = -u.dot(eye);
+        mat.m[2][3] = f.dot(eye);
+        return mat;
+    }
 };
 
 } // namespace math

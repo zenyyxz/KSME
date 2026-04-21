@@ -37,8 +37,7 @@ Framebuffer::~Framebuffer() {
     if (m_fd >= 0) close(m_fd);
 }
 
-void Framebuffer::draw_line(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const Color& c) {
-    uint32_t color = (c.a << 24) | (c.r << 16) | (c.g << 8) | c.b;
+void Framebuffer::draw_line(int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color) {
     int32_t dx = abs(x2 - x1), sx = x1 < x2 ? 1 : -1;
     int32_t dy = -abs(y2 - y1), sy = y1 < y2 ? 1 : -1;
     int32_t err = dx + dy;

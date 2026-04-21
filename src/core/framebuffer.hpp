@@ -20,7 +20,7 @@ public:
         *(uint32_t*)(m_backbuffer + y * m_finfo.line_length + (x << 2)) = color;
     }
 
-    void draw_line(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const Color& c);
+    void draw_line(int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color);
     void clear(const Color& c);
     void update();
 

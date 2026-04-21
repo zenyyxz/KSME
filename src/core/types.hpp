@@ -10,6 +10,10 @@ struct Color {
         return {r, g, b, a};
     }
 
+    uint32_t to_u32() const {
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
     static const Color RED;
     static const Color GREEN;
     static const Color BLUE;

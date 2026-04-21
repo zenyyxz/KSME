@@ -13,19 +13,15 @@ struct Vec3 {
     Vec3 operator-(const Vec3& other) const { return {x - other.x, y - other.y, z - other.z}; }
     Vec3 operator*(float s) const { return {x * s, y * s, z * s}; }
 
-    float dot(const Vec3& other) const { return x * other.x + y * other.y + z * other.z; }
-    Vec3 cross(const Vec3& other) const {
-        return {
-            y * other.z - z * other.y,
-            z * other.x - x * other.z,
-            x * other.y - y * other.x
-        };
+    float dot(const Vec3& o) const { return x*o.x + y*o.y + z*o.z; }
+    Vec3 cross(const Vec3& o) const {
+        return {y*o.z - z*o.y, z*o.x - x*o.z, x*o.y - y*o.x};
     }
 
-    float length() const { return std::sqrt(x * x + y * y + z * z); }
-    Vec3 normalized() const {
+    float length() const { return std::sqrt(x*x + y*y + z*z); }
+    Vec3 normalize() const {
         float l = length();
-        return l > 0 ? (*this) * (1.0f / l) : Vec3(0, 0, 0);
+        return l > 0.00001f ? (*this) * (1.0f / l) : Vec3(0,0,0);
     }
 };
 
