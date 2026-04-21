@@ -8,6 +8,16 @@
 #include <poll.h>
 #include <cstring>
 
+#ifndef KEY_1
+#define KEY_1 2
+#endif
+#ifndef KEY_2
+#define KEY_2 3
+#endif
+#ifndef KEY_3
+#define KEY_3 4
+#endif
+
 namespace input {
 
 class InputManager {
