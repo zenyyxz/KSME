@@ -1,5 +1,5 @@
 #pragma once
-#include "framebuffer.hpp"
+#include "drm_display.hpp"
 #include "../math/mat4.hpp"
 #include <vector>
 #include <functional>
@@ -47,8 +47,7 @@ public:
         }
     }
 
-    void draw(Framebuffer& fb, uint32_t color) {
-        // Multi-threaded draw: split the mesh into vertical chunks
+    void draw(DrmDisplay& fb, uint32_t color) {
         const int num_threads = std::thread::hardware_concurrency();
         std::vector<std::future<void>> futures;
         int chunk_size = m_ry / num_threads;
@@ -70,7 +69,7 @@ public:
     }
 
 private:
-    void draw_edge(Framebuffer& fb, int i1, int i2, uint32_t color) {
+    void draw_edge(DrmDisplay& fb, int i1, int i2, uint32_t color) {
         const auto& p1 = m_points[i1];
         const auto& p2 = m_points[i2];
         if (p1.visible && p2.visible) {

@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17 -O3 -pthread -Iinclude -Isrc
 
-SRC = src/main.cpp src/core/framebuffer.cpp
+SRC = src/main.cpp src/core/drm_display.cpp
 OBJ = $(SRC:.cpp=.o)
 TARGET = math_visualizer
 

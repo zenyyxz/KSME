@@ -1,4 +1,4 @@
-#include "core/framebuffer.hpp"
+#include "core/drm_display.hpp"
 #include "core/surface.hpp"
 #include "core/mesh_library.hpp"
 #include "math/mat4.hpp"
@@ -9,12 +9,11 @@
 #include <cmath>
 
 int main() {
-    core::Framebuffer fb("/dev/fb0");
-    if (!fb.is_valid()) return 1;
+    core::DrmDisplay display("/dev/dri/card0");
+    if (!display.is_valid()) return 1;
 
     input::InputManager input;
-    // 35x35 is the sweet spot for raw framebuffer throughput
-    core::Surface surface(35, 35); 
+    core::Surface surface(60, 60); 
     auto& library = core::MeshLibrary::get();
     std::string current_preset = "ripple";
 
@@ -33,7 +32,6 @@ int main() {
         time += dt;
         frame_count++;
 
-        // Print FPS every second
         if (std::chrono::duration<float>(now - fps_timer).count() >= 1.0f) {
             std::cout << "FPS: " << frame_count << std::endl;
             frame_count = 0;
@@ -46,7 +44,7 @@ int main() {
         if (input.get_key_state(KEY_2)) current_preset = "saddle";
         if (input.get_key_state(KEY_3)) current_preset = "waves";
 
-        float speed = 8.0f * dt;
+        float speed = 10.0f * dt;
         float sens = 2.5f * dt;
 
         math::Vec3 forward(std::cos(yaw) * std::cos(pitch), std::sin(pitch), std::sin(yaw) * std::cos(pitch));
@@ -61,30 +59,23 @@ int main() {
         if (input.get_key_state(KEY_LEFT)) yaw -= sens;
         if (input.get_key_state(KEY_RIGHT)) yaw += sens;
 
-        fb.clear(core::Color::BLACK);
+        display.clear(core::Color::BLACK);
 
         math::Mat4 view = math::Mat4::lookAt(cam_pos, cam_pos + forward, {0, 1, 0});
-        math::Mat4 proj = math::Mat4::perspective(1.0f, (float)fb.width()/fb.height(), 0.1f, 100.0f);
+        math::Mat4 proj = math::Mat4::perspective(1.0f, (float)display.width()/display.height(), 0.1f, 100.0f);
         math::Mat4 mvp = proj * view;
 
         surface.update([&](float x, float y) {
             return library.evaluate(current_preset, x, y, time);
         }, -15, 15, -15, 15);
 
-        surface.project(mvp, fb.width(), fb.height());
-        surface.draw(fb, core::Color::GREEN.to_u32());
+        surface.project(mvp, display.width(), display.height());
+        surface.draw(display, core::Color::GREEN.to_u32());
 
-        fb.update();
-
-        // Even more aggressive hybrid pacing
-        const float target_dt = 1.0f / 75.0f; // Aim slightly higher than 60
-        auto end_frame = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration<float>(std::chrono::high_resolution_clock::now() - now).count() < target_dt) {
-            for (int i = 0; i < 100; ++i) __builtin_ia32_pause(); 
-        }
+        display.update(); // Synchronized to monitor refresh rate
     }
 
-    fb.clear(core::Color::BLACK);
-    fb.update();
+    display.clear(core::Color::BLACK);
+    display.update();
     return 0;
 }
