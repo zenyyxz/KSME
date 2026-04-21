@@ -13,7 +13,8 @@ int main() {
     if (!fb.is_valid()) return 1;
 
     input::InputManager input;
-    core::Surface surface(45, 45); // Slightly higher res for the "weapon"
+    // 35x35 is the sweet spot for raw framebuffer throughput
+    core::Surface surface(35, 35); 
     auto& library = core::MeshLibrary::get();
     std::string current_preset = "ripple";
 
@@ -22,21 +23,29 @@ int main() {
     float time = 0;
 
     auto last_time = std::chrono::high_resolution_clock::now();
+    int frame_count = 0;
+    auto fps_timer = last_time;
     
     while (!input.get_key_state(KEY_ESC)) {
         auto now = std::chrono::high_resolution_clock::now();
         float dt = std::chrono::duration<float>(now - last_time).count();
         last_time = now;
         time += dt;
+        frame_count++;
+
+        // Print FPS every second
+        if (std::chrono::duration<float>(now - fps_timer).count() >= 1.0f) {
+            std::cout << "FPS: " << frame_count << std::endl;
+            frame_count = 0;
+            fps_timer = now;
+        }
 
         input.update();
 
-        // Preset switching
         if (input.get_key_state(KEY_1)) current_preset = "ripple";
         if (input.get_key_state(KEY_2)) current_preset = "saddle";
         if (input.get_key_state(KEY_3)) current_preset = "waves";
 
-        // Camera control (The smoother path)
         float speed = 8.0f * dt;
         float sens = 2.5f * dt;
 
@@ -47,7 +56,6 @@ int main() {
         if (input.get_key_state(KEY_S)) cam_pos = cam_pos - forward * speed;
         if (input.get_key_state(KEY_A)) cam_pos = cam_pos - right * speed;
         if (input.get_key_state(KEY_D)) cam_pos = cam_pos + right * speed;
-        
         if (input.get_key_state(KEY_UP)) pitch += sens;
         if (input.get_key_state(KEY_DOWN)) pitch -= sens;
         if (input.get_key_state(KEY_LEFT)) yaw -= sens;
@@ -68,22 +76,11 @@ int main() {
 
         fb.update();
 
-        // High-Performance Pacing: Hybrid Sleep + Busy Wait
-        // This keeps the CPU from downclocking and eliminates "micro-stutter"
-        const float target_dt = 1.0f / 60.0f;
+        // Even more aggressive hybrid pacing
+        const float target_dt = 1.0f / 75.0f; // Aim slightly higher than 60
         auto end_frame = std::chrono::high_resolution_clock::now();
-        float elapsed = std::chrono::duration<float>(end_frame - now).count();
-        
-        if (elapsed < target_dt) {
-            // Sleep for the bulk of the time
-            float sleep_time = (target_dt - elapsed) * 0.8f; 
-            if (sleep_time > 0.001f) {
-                std::this_thread::sleep_for(std::chrono::duration<float>(sleep_time));
-            }
-            // Busy wait for the last bit to stay precise and keep CPU clocks up
-            while (std::chrono::duration<float>(std::chrono::high_resolution_clock::now() - now).count() < target_dt) {
-                __builtin_ia32_pause(); // Hint to CPU that we're in a spin loop
-            }
+        while (std::chrono::duration<float>(std::chrono::high_resolution_clock::now() - now).count() < target_dt) {
+            for (int i = 0; i < 100; ++i) __builtin_ia32_pause(); 
         }
     }
 
