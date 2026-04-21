@@ -15,8 +15,8 @@ public:
     uint32_t width() const { return m_vinfo.xres; }
     uint32_t height() const { return m_vinfo.yres; }
 
-    inline void put_pixel(uint32_t x, uint32_t y, uint32_t color) {
-        if (x >= m_vinfo.xres || y >= m_vinfo.yres) return;
+    inline void put_pixel(int32_t x, int32_t y, uint32_t color) {
+        if (x < 0 || y < 0 || x >= (int32_t)m_vinfo.xres || y >= (int32_t)m_vinfo.yres) return;
         *(uint32_t*)(m_backbuffer + y * m_finfo.line_length + (x << 2)) = color;
     }
 
