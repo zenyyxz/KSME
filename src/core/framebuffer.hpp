@@ -1,25 +1,28 @@
 #pragma once
 #include <linux/fb.h>
 #include <cstdint>
+#include <cstring>
 #include "types.hpp"
 
 namespace core {
 
 class Framebuffer {
 public:
-    Framebuffer(const char* device_path = "/dev/fb0");
+    Framebuffer(const char* dev = "/dev/fb0");
     ~Framebuffer();
 
     bool is_valid() const { return m_fb_ptr != nullptr; }
+    uint32_t width() const { return m_vinfo.xres; }
+    uint32_t height() const { return m_vinfo.yres; }
 
-    uint32_t get_width() const { return m_vinfo.xres; }
-    uint32_t get_height() const { return m_vinfo.yres; }
-    uint32_t get_bpp() const { return m_vinfo.bits_per_pixel; }
+    inline void put_pixel(uint32_t x, uint32_t y, uint32_t color) {
+        if (x >= m_vinfo.xres || y >= m_vinfo.yres) return;
+        *(uint32_t*)(m_backbuffer + y * m_finfo.line_length + (x << 2)) = color;
+    }
 
-    void put_pixel(uint32_t x, uint32_t y, const Color& color);
-    void draw_line(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const Color& color);
-    void clear(const Color& color);
-    void update(); 
+    void draw_line(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const Color& c);
+    void clear(const Color& c);
+    void update();
 
 private:
     int m_fd;
