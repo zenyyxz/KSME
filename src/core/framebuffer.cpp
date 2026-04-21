@@ -71,7 +71,7 @@ void Framebuffer::clear(const Color& c) {
 
 void Framebuffer::update() {
     if (m_fb_ptr && m_backbuffer) {
-        // Some drivers don't support VSync, so we check return value
+        // Try VSync but don't hang if it fails
         uint32_t dummy = 0;
         ioctl(m_fd, FBIO_WAITFORVSYNC, &dummy);
         memcpy(m_fb_ptr, m_backbuffer, m_screensize);

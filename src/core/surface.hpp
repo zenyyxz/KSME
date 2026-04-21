@@ -3,6 +3,8 @@
 #include "../math/mat4.hpp"
 #include <vector>
 #include <functional>
+#include <thread>
+#include <future>
 
 namespace core {
 
@@ -20,11 +22,10 @@ public:
 
     void update(std::function<float(float, float)> func, float x_min, float x_max, float y_min, float y_max) {
         for (int j = 0; j < m_ry; ++j) {
+            float fy = y_min + (float)j / (m_ry - 1) * (y_max - y_min);
             for (int i = 0; i < m_rx; ++i) {
                 float fx = x_min + (float)i / (m_rx - 1) * (x_max - x_min);
-                float fy = y_min + (float)j / (m_ry - 1) * (y_max - y_min);
-                float fz = func(fx, fy);
-                m_points[j * m_rx + i].world = {fx, fz, fy};
+                m_points[j * m_rx + i].world = {fx, func(fx, fy), fy};
             }
         }
     }
@@ -47,16 +48,25 @@ public:
     }
 
     void draw(Framebuffer& fb, uint32_t color) {
-        for (int j = 0; j < m_ry; ++j) {
-            for (int i = 0; i < m_rx; ++i) {
-                if (i < m_rx - 1) {
-                    draw_edge(fb, j * m_rx + i, j * m_rx + i + 1, color);
+        // Multi-threaded draw: split the mesh into vertical chunks
+        const int num_threads = std::thread::hardware_concurrency();
+        std::vector<std::future<void>> futures;
+        int chunk_size = m_ry / num_threads;
+
+        for (int t = 0; t < num_threads; ++t) {
+            int start_y = t * chunk_size;
+            int end_y = (t == num_threads - 1) ? m_ry : (t + 1) * chunk_size;
+
+            futures.push_back(std::async(std::launch::async, [this, &fb, start_y, end_y, color]() {
+                for (int j = start_y; j < end_y; ++j) {
+                    for (int i = 0; i < m_rx; ++i) {
+                        if (i < m_rx - 1) draw_edge(fb, j * m_rx + i, j * m_rx + i + 1, color);
+                        if (j < m_ry - 1) draw_edge(fb, j * m_rx + i, (j + 1) * m_rx + i, color);
+                    }
                 }
-                if (j < m_ry - 1) {
-                    draw_edge(fb, j * m_rx + i, (j + 1) * m_rx + i, color);
-                }
-            }
+            }));
         }
+        for (auto& f : futures) f.wait();
     }
 
 private:
