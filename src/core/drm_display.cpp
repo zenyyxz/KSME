@@ -7,6 +7,7 @@
 #include <vector>
 #include <cstring>
 #include <errno.h>
+#include <poll.h>
 
 namespace core {
 
@@ -203,7 +204,6 @@ void DrmDisplay::create_buffer(Buffer& buf) {
 }
 
 void DrmDisplay::update() {
-    // Page Flip
     struct drm_mode_crtc_page_flip flip = {};
     flip.crtc_id = m_crtc_id;
     flip.fb_id = m_buffers[m_back_idx].fb_id;
@@ -213,9 +213,32 @@ void DrmDisplay::update() {
         m_active_fb_id = m_buffers[m_back_idx].fb_id;
         m_back_idx = (m_back_idx + 1) % 2;
 
-        // Wait for flip event (keeps the loop synced to refresh rate)
-        struct drm_event ev;
-        while (read(m_fd, &ev, sizeof(ev)) < 0);
+        // Wait for the flip event to sync with the refresh rate
+        struct pollfd pfd = { .fd = m_fd, .events = POLLIN };
+        if (poll(&pfd, 1, 100) > 0) { // 100ms timeout
+            uint8_t buffer[1024];
+            int len;
+            while ((len = read(m_fd, buffer, sizeof(buffer))) < 0) {
+                if (errno != EINTR) break; 
+            }
+        }
+    } else {
+        // Fallback to SETCRTC if Page Flip is not supported or busy
+        struct drm_mode_crtc set_crtc = {};
+        set_crtc.crtc_id = m_crtc_id;
+        set_crtc.fb_id = m_buffers[m_back_idx].fb_id;
+        set_crtc.set_connectors_ptr = (uint64_t)&m_conn_id;
+        set_crtc.count_connectors = 1;
+        set_crtc.mode = m_mode;
+        set_crtc.mode_valid = 1;
+        
+        if (ioctl(m_fd, DRM_IOCTL_MODE_SETCRTC, &set_crtc) >= 0) {
+            m_active_fb_id = m_buffers[m_back_idx].fb_id;
+            m_back_idx = (m_back_idx + 1) % 2;
+        }
+
+        // Prevent 'too fast' execution when falling back
+        usleep(1000); 
     }
 }
 
