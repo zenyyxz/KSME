@@ -1,0 +1,21 @@
+# Binaries and Object files
+math_visualizer
+test_input
+*.o
+src/*.o
+src/**/*.o
+
+# Assets and Records
+output.mkv
+ffmpeg_output.txt
+
+# Logs and Debugging
+cmd_output.txt
+tty_output.txt
+grep_out.txt
+cmd.txt
+drm_check.cpp
+
+# System
+.DS_Store
+.cache/
