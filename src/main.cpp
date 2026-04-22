@@ -1,12 +1,15 @@
 #include "core/drm_display.hpp"
 #include "core/surface.hpp"
 #include "core/mesh_library.hpp"
+#include "core/font.hpp"
 #include "math/mat4.hpp"
 #include "input/input_manager.hpp"
 #include <iostream>
 #include <chrono>
 #include <thread>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 
 int main() {
     core::DrmDisplay display("/dev/dri/card1");
@@ -16,16 +19,17 @@ int main() {
     }
 
     input::InputManager input;
-    core::Surface surface(60, 60); 
+    core::Surface surface(80, 80); 
     auto& library = core::MeshLibrary::get();
-    std::string current_preset = "ripple";
+    std::string current_preset = "torus";
 
-    math::Vec3 cam_pos(0, 8, 15);
-    float yaw = -1.57f, pitch = -0.5f;
+    math::Vec3 cam_pos(0, 10, 25);
+    float yaw = -1.57f, pitch = -0.3f;
     float time = 0;
 
     auto last_time = std::chrono::high_resolution_clock::now();
     int frame_count = 0;
+    float fps = 0;
     auto fps_timer = last_time;
     
     while (!input.get_key_state(KEY_ESC)) {
@@ -36,7 +40,7 @@ int main() {
         frame_count++;
 
         if (std::chrono::duration<float>(now - fps_timer).count() >= 1.0f) {
-            std::cout << "FPS: " << frame_count << std::endl;
+            fps = frame_count;
             frame_count = 0;
             fps_timer = now;
         }
@@ -44,10 +48,11 @@ int main() {
         input.update();
 
         if (input.get_key_state(KEY_1)) current_preset = "ripple";
-        if (input.get_key_state(KEY_2)) current_preset = "saddle";
-        if (input.get_key_state(KEY_3)) current_preset = "waves";
+        if (input.get_key_state(KEY_2)) current_preset = "torus";
+        if (input.get_key_state(KEY_3)) current_preset = "mobius";
+        if (input.get_key_state(KEY_4)) current_preset = "klein";
 
-        float speed = 10.0f * dt;
+        float speed = 15.0f * dt;
         float sens = 2.5f * dt;
 
         math::Vec3 forward(std::cos(yaw) * std::cos(pitch), std::sin(pitch), std::sin(yaw) * std::cos(pitch));
@@ -68,14 +73,21 @@ int main() {
         math::Mat4 proj = math::Mat4::perspective(1.0f, (float)display.width()/display.height(), 0.1f, 100.0f);
         math::Mat4 mvp = proj * view;
 
-        surface.update([&](float x, float y) {
-            return library.evaluate(current_preset, x, y, time);
-        }, -15, 15, -15, 15);
+        auto range = library.get_range(current_preset);
+        surface.update([&](float u, float v) {
+            return library.evaluate(current_preset, u, v, time);
+        }, range.u_min, range.u_max, range.v_min, range.v_max);
 
         surface.project(mvp, display.width(), display.height());
-        surface.draw(display, core::Color::GREEN.to_u32());
+        surface.draw(display);
 
-        display.update(); // Synchronized to monitor refresh rate
+        // Draw HUD
+        std::stringstream ss;
+        ss << "FPS: " << (int)fps << " PRESET: " << current_preset;
+        core::FontRenderer::draw_text(display, 20, 20, ss.str(), core::Color::WHITE.to_u32(), 3);
+        core::FontRenderer::draw_text(display, 20, 50, "WASD: MOVE  ARROWS: LOOK  1-4: SWITCH", 0xFFAAAAAA, 2);
+
+        display.update();
     }
 
     display.clear(core::Color::BLACK);

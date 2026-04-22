@@ -1,50 +1,77 @@
 #pragma once
-#include "framebuffer.hpp"
 #include "surface.hpp"
 #include <map>
 #include <string>
 #include <memory>
+#include <cmath>
 
 namespace core {
 
 class MeshLibrary {
 public:
-    using Func = std::function<float(float, float, float)>;
+    struct Range { float u_min, u_max, v_min, v_max; };
+    using Func = std::function<math::Vec3(float, float, float)>;
 
     static MeshLibrary& get() {
         static MeshLibrary instance;
         return instance;
     }
 
-    void add_preset(const std::string& name, Func f) {
-        m_presets[name] = f;
+    void add_preset(const std::string& name, Func f, Range r) {
+        m_presets[name] = {f, r};
     }
 
-    float evaluate(const std::string& name, float x, float y, float t) {
-        if (m_presets.count(name)) return m_presets[name](x, y, t);
-        return 0;
+    math::Vec3 evaluate(const std::string& name, float u, float v, float t) {
+        if (m_presets.count(name)) return m_presets[name].f(u, v, t);
+        return {0, 0, 0};
+    }
+
+    Range get_range(const std::string& name) {
+        if (m_presets.count(name)) return m_presets[name].r;
+        return {-10, 10, -10, 10};
     }
 
 private:
+    struct Entry { Func f; Range r; };
+
     MeshLibrary() {
-        // The "Fire" Ripple
+        // Classic Ripple (Heightmap)
         add_preset("ripple", [](float x, float y, float t) {
             float d = std::sqrt(x*x + y*y);
-            return std::sin(d - t * 3.0f) * 2.0f;
-        });
+            return math::Vec3(x, std::sin(d - t * 3.0f) * 2.0f, y);
+        }, {-15, 15, -15, 15});
 
-        // Saddle / Pringle
-        add_preset("saddle", [](float x, float y, float) {
-            return (x*x - y*y) * 0.1f;
-        });
+        // Torus (Donut)
+        add_preset("torus", [](float u, float v, float t) {
+            float R = 8.0f;
+            float r = 3.0f + std::sin(t * 2.0f) * 0.5f;
+            return math::Vec3(
+                (R + r * std::cos(v)) * std::cos(u),
+                r * std::sin(v),
+                (R + r * std::cos(v)) * std::sin(u)
+            );
+        }, {0, 2 * M_PI, 0, 2 * M_PI});
 
-        // Wave tank
-        add_preset("waves", [](float x, float y, float t) {
-            return std::sin(x + t) * std::cos(y + t);
-        });
+        // Mobius Strip
+        add_preset("mobius", [](float u, float v, float t) {
+            float a = 6.0f;
+            float x = (a + v/2.0f * std::cos(u/2.0f)) * std::cos(u + t);
+            float y = v/2.0f * std::sin(u/2.0f);
+            float z = (a + v/2.0f * std::cos(u/2.0f)) * std::sin(u + t);
+            return math::Vec3(x, y, z);
+        }, {0, 2 * M_PI, -3, 3});
+
+        // Klein Bottle (Bagel-like version)
+        add_preset("klein", [](float u, float v, float t) {
+            float a = 6.0f;
+            float x = (a + std::cos(u/2.0f) * std::sin(v) - std::sin(u/2.0f) * std::sin(2.0f*v)) * std::cos(u + t);
+            float y = std::sin(u/2.0f) * std::sin(v) + std::cos(u/2.0f) * std::sin(2.0f*v);
+            float z = (a + std::cos(u/2.0f) * std::sin(v) - std::sin(u/2.0f) * std::sin(2.0f*v)) * std::sin(u + t);
+            return math::Vec3(x, y, z);
+        }, {0, 2 * M_PI, 0, 2 * M_PI});
     }
 
-    std::map<std::string, Func> m_presets;
+    std::map<std::string, Entry> m_presets;
 };
 
 } // namespace core
