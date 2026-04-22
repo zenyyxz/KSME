@@ -69,6 +69,22 @@ private:
             float z = (a + std::cos(u/2.0f) * std::sin(v) - std::sin(u/2.0f) * std::sin(2.0f*v)) * std::sin(u + t);
             return math::Vec3(x, y, z);
         }, {0, 2 * M_PI, 0, 2 * M_PI});
+
+        // 3D Coordinate Plane / Sandbox
+        add_preset("plane", [](float x, float y, float t) {
+            // Visualize a flat grid that shows function z = f(x, y, t)
+            float z = std::sin(x + t) * std::cos(y + t);
+            return math::Vec3(x, z, y);
+        }, {-15, 15, -15, 15});
+
+        // "The Beast" - Multi-component complex parametric surface
+        add_preset("beast", [](float u, float v, float t) {
+            float r = 5.0f * (1.0f + 0.3f * std::sin(8.0f * u + t));
+            float x = r * std::cos(u) * std::sin(v);
+            float y = r * std::sin(u) * std::sin(v) + std::cos(3.0f * v + t);
+            float z = r * std::cos(v);
+            return math::Vec3(x, y, z);
+        }, {0, 2 * M_PI, 0, M_PI});
     }
 
     std::map<std::string, Entry> m_presets;

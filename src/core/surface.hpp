@@ -22,20 +22,48 @@ public:
 
     // Parametric update: func(u, v) -> Vec3(x, y, z)
     void update(std::function<math::Vec3(float, float)> func, 
-                float u_min, float u_max, float v_min, float v_max) {
+                float u_min, float u_max, float v_min, float v_max, float time) {
+        // 1. Calculate world positions
         for (int j = 0; j < m_rv; ++j) {
             float fv = v_min + (float)j / (m_rv - 1) * (v_max - v_min);
             for (int i = 0; i < m_ru; ++i) {
                 float fu = u_min + (float)i / (m_ru - 1) * (u_max - u_min);
+                m_points[j * m_ru + i].world = func(fu, fv);
+            }
+        }
+
+        // 2. Calculate normals and colors with dynamic lighting
+        // Rotating light source for dynamic shadows
+        math::Vec3 light_dir = math::Vec3(std::cos(time), 1.0f, std::sin(time)).normalize();
+        
+        for (int j = 0; j < m_rv; ++j) {
+            for (int i = 0; i < m_ru; ++i) {
                 auto& p = m_points[j * m_ru + i];
-                p.world = func(fu, fv);
                 
-                // Dynamic height-based color (Blue -> Green -> Red)
-                float h = (p.world.y + 5.0f) / 10.0f; // Normalized -5 to 5
-                if (h < 0) h = 0; if (h > 1) h = 1;
-                uint8_t r = (uint8_t)(h * 255);
-                uint8_t g = (uint8_t)((1.0f - std::abs(h - 0.5f) * 2.0f) * 255);
-                uint8_t b = (uint8_t)((1.0f - h) * 255);
+                // Better normal estimation using central differences where possible
+                math::Vec3 v_u, v_v;
+                if (i < m_ru - 1) v_u = m_points[j * m_ru + i + 1].world - p.world;
+                else v_u = p.world - m_points[j * m_ru + i - 1].world;
+                
+                if (j < m_rv - 1) v_v = m_points[(j + 1) * m_ru + i].world - p.world;
+                else v_v = p.world - m_points[(j - 1) * m_ru + i].world;
+                
+                math::Vec3 normal = v_u.cross(v_v).normalize();
+
+                // Two-sided lighting (more visible wireframes)
+                float dot = std::abs(normal.dot(light_dir));
+                float intensity = 0.3f + 0.7f * dot; // Higher ambient
+
+                // Enhanced color mapping: mix height and radial distance
+                float dist = p.world.length() * 0.1f;
+                float h = (p.world.y + 4.0f) * 0.15f; // Scale height for better range
+                
+                float factor = std::sin(h + dist + time) * 0.5f + 0.5f;
+                
+                uint8_t r = (uint8_t)((0.5f + 0.5f * std::sin(factor * 3.0f)) * 255 * intensity);
+                uint8_t g = (uint8_t)((0.5f + 0.5f * std::cos(factor * 2.0f)) * 255 * intensity);
+                uint8_t b = (uint8_t)((0.5f + 0.5f * std::sin(factor * 1.0f + 2.0f)) * 255 * intensity);
+                
                 p.color = (255 << 24) | (r << 16) | (g << 8) | b;
             }
         }
