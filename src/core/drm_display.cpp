@@ -13,6 +13,8 @@
 #include <cstring>
 #include <errno.h>
 #include <poll.h>
+#include <sys/kd.h>
+#include <sys/vt.h>
 
 namespace core {
 
@@ -33,6 +35,13 @@ DrmDisplay::~DrmDisplay() {
 }
 
 bool DrmDisplay::init_drm() {
+    // Force the Virtual Terminal into Graphics Mode to hide cursor/text
+    int tty_fd = open("/dev/tty", O_RDWR);
+    if (tty_fd >= 0) {
+        ioctl(tty_fd, KDSETMODE, KD_GRAPHICS);
+        close(tty_fd);
+    }
+
     std::cerr << "Initializing DRM..." << std::endl;
     // 1. Resource Discovery
     // Query the kernel for available connectors (physical ports), encoders, and CRTCs (scanout engines).
@@ -129,12 +138,18 @@ bool DrmDisplay::init_drm() {
         std::cerr << "DRM_IOCTL_MODE_GETENCODER failed: " << strerror(errno) << std::endl;
         return false;
     }
+// Pick a CRTC. If encoder has none, pick the first available from card resources
+m_crtc_id = enc.crtc_id ? enc.crtc_id : (res.count_crtcs > 0 ? crtc_ids[0] : 0);
+if (m_crtc_id == 0) {
+    std::cerr << "No valid CRTC found for encoder." << std::endl;
+    return false;
+}
 
-    // Pick a CRTC. If encoder has none, pick the first available from card resources
-    m_crtc_id = enc.crtc_id ? enc.crtc_id : (res.count_crtcs > 0 ? crtc_ids[0] : 0);
-    if (m_crtc_id == 0) {
-        std::cerr << "No valid CRTC found for encoder." << std::endl;
-        return false;
+    // Save current CRTC state to restore on exit
+    m_saved_crtc = {};
+    m_saved_crtc.crtc_id = m_crtc_id;
+    if (ioctl(m_fd, DRM_IOCTL_MODE_GETCRTC, &m_saved_crtc) < 0) {
+        std::cerr << "Warning: Could not save original CRTC state." << std::endl;
     }
 
     // 4. Memory-Mapped Buffer Creation
@@ -148,7 +163,18 @@ bool DrmDisplay::init_drm() {
 
     // 5. Acquisition of DRM Master
     // Request exclusive control of the graphics hardware.
-    if (ioctl(m_fd, DRM_IOCTL_SET_MASTER, 0) < 0) {
+    // We retry up to 5 times in case another process (like a recorder) is briefly holding a lock.
+    bool master_acquired = false;
+    for (int retry = 0; retry < 5; ++retry) {
+        if (ioctl(m_fd, DRM_IOCTL_SET_MASTER, 0) >= 0) {
+            master_acquired = true;
+            break;
+        }
+        std::cerr << "Retrying DRM master acquisition..." << std::endl;
+        usleep(200000); // 200ms
+    }
+    
+    if (!master_acquired) {
         std::cerr << "DRM_IOCTL_SET_MASTER failed: " << strerror(errno) << " (Check if another display manager is running)" << std::endl;
     }
 
@@ -281,16 +307,24 @@ void DrmDisplay::draw_line(int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint3
 
 void DrmDisplay::cleanup_drm() {
     if (m_fd < 0) return;
-    for (int i = 0; i < 2; ++i) {
-        if (m_buffers[i].map) munmap(m_buffers[i].map, m_buffers[i].size);
-        if (m_buffers[i].fb_id) ioctl(m_fd, DRM_IOCTL_MODE_RMFB, &m_buffers[i].fb_id);
-        if (m_buffers[i].handle) {
-            struct drm_mode_destroy_dumb destroy = { m_buffers[i].handle };
-            ioctl(m_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
-        }
+
+    // 1. Relinquish hardware control
+    ioctl(m_fd, DRM_IOCTL_DROP_MASTER, 0);
+
+    // 2. Restore text mode
+    int tty_fd = open("/dev/tty", O_RDWR);
+    if (tty_fd >= 0) {
+        ioctl(tty_fd, KDSETMODE, KD_TEXT);
+        ioctl(tty_fd, KDSKBMODE, 0x01); // K_XLATE
+        close(tty_fd);
     }
+
     close(m_fd);
     m_fd = -1;
+
+    // 3. ANSI hard reset
+    printf("\033c"); 
+    fflush(stdout);
 }
 
 } // namespace core

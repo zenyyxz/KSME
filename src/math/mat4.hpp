@@ -1,3 +1,9 @@
+/*
+ * 4x4 HOMOGENEOUS TRANSFORMATION PIPELINE
+ * Implements linear algebra for 3D-to-2D projection. 
+ * Standard column-major logic for world-view-projection transforms.
+ */
+
 #pragma once
 #include "vec3.hpp"
 #include <cmath>
@@ -75,6 +81,7 @@ struct Mat4 {
         return mat;
     }
 
+    // Generates a perspective projection matrix to simulate depth and FOV.
     static Mat4 perspective(float fov, float aspect, float near, float far) {
         Mat4 mat;
         float f = 1.0f / std::tan(fov / 2.0f);
@@ -86,6 +93,7 @@ struct Mat4 {
         return mat;
     }
 
+    // Generates a View Matrix based on eye, target, and world-up vectors.
     static Mat4 lookAt(Vec3 eye, Vec3 target, Vec3 up) {
         Vec3 f = (target - eye).normalize();
         Vec3 s = f.cross(up).normalize();

@@ -1,3 +1,9 @@
+/*
+ * LINEAR ALGEBRA PRIMITIVES
+ * Provides core 3D vector and homogeneous coordinate (Vec4) logic.
+ * Foundations for world-space transformations and projection.
+ */
+
 #pragma once
 #include <cmath>
 

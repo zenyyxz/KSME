@@ -1,3 +1,9 @@
+/*
+ * VECTOR GLYPH ENGINE
+ * Custom-encoded glyph definitions for real-time telemetry display.
+ * Implements a software-scaled font renderer for standalone TTY environments.
+ */
+
 #pragma once
 #include <vector>
 #include <string>
@@ -12,6 +18,7 @@ struct VectorChar {
 
 class FontRenderer {
 public:
+    // Performs software-scaled string rasterization into the display buffer.
     template<typename T>
     static void draw_text(T& fb, int x, int y, const std::string& text, uint32_t color, int scale = 2) {
         int cur_x = x;
@@ -21,6 +28,7 @@ public:
         }
     }
 
+    // Renders a bordered UI container for formula input.
     template<typename T>
     static void draw_box(T& fb, int x, int y, int w, int h, uint32_t color, const std::string& title = "") {
         // Border

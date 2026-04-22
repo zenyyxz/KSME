@@ -2,17 +2,10 @@
  * Runtime Mathematical Expression Parser
  * Implements a Recursive Descent Parser (LL(1)) for evaluating strings 
  * into mathematical functions at runtime. 
- *
- * Grammer:
- *   Expression -> Term { ('+'|'-') Term }
- *   Term       -> Factor { ('*'|'/') Factor }
- *   Factor     -> Power [ '^' Factor ]
- *   Power      -> [ '-' ] ( '(' Expression ')' | Function | Number | Variable )
  */
 
 #pragma once
 #include <string>
-...
 #include <vector>
 #include <cmath>
 #include <functional>
@@ -40,7 +33,7 @@ private:
 
     char peek() { return m_pos < m_expr.length() ? m_expr[m_pos] : 0; }
     char get() { return m_pos < m_expr.length() ? m_expr[m_pos++] : 0; }
-    void skip_ws() { while (std::isspace(peek())) m_pos++; }
+    void skip_ws() { while (m_pos < m_expr.length() && std::isspace(peek())) m_pos++; }
 
     Func parse_expression() {
         Func f = parse_term();
@@ -63,7 +56,8 @@ private:
             Func next = parse_factor();
             if (op == '*') f = [f, next](float x, float y, float t) { return f(x, y, t) * next(x, y, t); };
             else f = [f, next](float x, float y, float t) { 
-                return next(x, y, t) != 0 ? f(x, y, t) / next(x, y, t) : 0; 
+                float val = next(x, y, t);
+                return val != 0 ? f(x, y, t) / val : 0; 
             };
             skip_ws();
         }
@@ -97,18 +91,17 @@ private:
         }
         if (std::isdigit(c)) {
             std::string s;
-            while (std::isdigit(peek()) || peek() == '.') s += get();
+            while (m_pos < m_expr.length() && (std::isdigit(peek()) || peek() == '.')) s += get();
             float val = std::stof(s);
             return [val](float, float, float) { return val; };
         }
         if (std::isalpha(c)) {
             std::string s;
-            while (std::isalpha(peek())) s += get();
+            while (m_pos < m_expr.length() && std::isalpha(peek())) s += get();
             if (s == "x") return [](float x, float, float) { return x; };
             if (s == "y") return [](float, float y, float) { return y; };
             if (s == "t") return [](float, float, float t) { return t; };
             
-            // Functions
             skip_ws();
             if (peek() == '(') {
                 get();

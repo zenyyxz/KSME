@@ -1,3 +1,9 @@
+/*
+ * ASYNCHRONOUS INPUT SUBSYSTEM
+ * Interfaces with Linux evdev (/dev/input/event*) for low-latency event processing.
+ * Supports multiple concurrent input devices (Multi-KBD/Mouse).
+ */
+
 #pragma once
 #include <linux/input.h>
 #include <fcntl.h>
@@ -23,6 +29,12 @@ namespace input {
 class InputManager {
 public:
     InputManager() : m_mouse_fd(-1) {
+        /*
+         * HARDWARE DISCOVERY
+         * Iterates through the evdev subsystem to identify suitable HID devices.
+         * Filtered by capability bitmasks (EVIOCGBIT) to distinguish between
+         * keyboards (KEY_ESC presence) and mice (REL_X/REL_Y presence).
+         */
         std::memset(m_key_states, 0, sizeof(m_key_states));
         m_mouse_x = 0; m_mouse_y = 0; m_last_char = 0;
         
@@ -66,6 +78,11 @@ public:
     }
 
     void update() {
+        /*
+         * ASYNCHRONOUS EVENT POLLING
+         * Performs non-blocking reads on all registered hardware file descriptors.
+         * Accumulates delta-movements and latches key states for frame-synchronous retrieval.
+         */
         m_mouse_x = 0; m_mouse_y = 0;
         
         for (int fd : m_kbd_fds) {
@@ -111,6 +128,11 @@ public:
     }
 
 private:
+    /*
+     * CHARACTER TRANSLATION LAYER
+     * Maps raw Linux input event codes to ASCII representations.
+     * Samples modifiers (Shift) at the point-of-interest for the parser buffer.
+     */
     char keycode_to_char(int code) {
         bool shift = (m_key_states[KEY_LEFTSHIFT] > 0) || (m_key_states[KEY_RIGHTSHIFT] > 0);
         switch (code) {

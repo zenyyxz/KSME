@@ -42,6 +42,7 @@ private:
     
     // Manual structs for mode info
     struct drm_mode_modeinfo m_mode;
+    struct drm_mode_crtc m_saved_crtc;
     
     Buffer m_buffers[2];
     int m_back_idx;

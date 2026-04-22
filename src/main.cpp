@@ -1,3 +1,8 @@
+/*
+ * MATH ENGINE ENTRY POINT
+ * Coordinates hardware display, input events, and mathematical evaluation.
+ */
+
 #include "core/drm_display.hpp"
 #include "core/surface.hpp"
 #include "core/mesh_library.hpp"
@@ -11,16 +16,33 @@
 #include <cmath>
 #include <iomanip>
 #include <sstream>
+#include <termios.h>
 
 enum class UIState { Normal, Input };
 enum class PlotMode { Surface, Line };
 
 int main() {
-    core::DrmDisplay display("/dev/dri/card1");
-    if (!display.is_valid()) {
-        std::cerr << "Error: Could not initialize DRM device /dev/dri/card1." << std::endl;
-        return 1;
-    }
+    /* 
+     * TERMINAL INITIALIZATION
+     * Suspends standard shell echoing to prevent input leakage during camera translation.
+     */
+    struct termios old_t, new_t;
+    tcgetattr(STDIN_FILENO, &old_t);
+    new_t = old_t;
+    new_t.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_t);
+
+    {
+        /*
+         * DISPLAY INITIALIZATION
+         * Acquires DRM Mastership for direct hardware memory mapping.
+         */
+        core::DrmDisplay display("/dev/dri/card1");
+        if (!display.is_valid()) {
+            tcsetattr(STDIN_FILENO, TCSANOW, &old_t);
+            std::cerr << "Error: Could not initialize DRM device /dev/dri/card1." << std::endl;
+            return 1;
+        }
 
     input::InputManager input;
     core::Surface surface(120, 120); 
@@ -59,6 +81,7 @@ int main() {
         time += dt; // Always update time
         frame_count++;
 
+        // TELEMETRY: Calculate smoothed FPS
         if (std::chrono::duration<float>(now - fps_timer).count() >= 1.0f) {
             fps = frame_count;
             frame_count = 0;
@@ -67,6 +90,9 @@ int main() {
 
         input.update();
 
+        /*
+         * STATE MACHINE: NORMAL NAVIGATION MODE
+         */
         if (ui_state == UIState::Normal) {
             if (input.get_key_state(KEY_1)) current_preset = "ripple";
             if (input.get_key_state(KEY_2)) current_preset = "torus";
@@ -89,7 +115,7 @@ int main() {
             float sens_kbd = 2.5f * dt;
             float sens_mouse = 0.005f;
 
-            // Mouse rotation
+            // CAMERA TRANSFORMATIONS: First-person spherical coordinates
             yaw += input.get_mouse_dx() * sens_mouse;
             pitch -= input.get_mouse_dy() * sens_mouse;
 
@@ -108,7 +134,9 @@ int main() {
             if (pitch > 1.5f) pitch = 1.5f;
             if (pitch < -1.5f) pitch = -1.5f;
         } else {
-            // Input mode logic
+            /*
+             * STATE MACHINE: FORMULA COMPILATION MODE
+             */
             char c = input.get_last_char();
             bool ctrl = input.get_key_state(KEY_LEFTCTRL) || input.get_key_state(KEY_RIGHTCTRL);
             
@@ -140,6 +168,9 @@ int main() {
 
         display.clear(core::Color::BLACK);
 
+        /*
+         * RENDERING PIPELINE: MVP Matrix Generation
+         */
         math::Vec3 forward_vec(std::cos(yaw) * std::cos(pitch), std::sin(pitch), std::sin(yaw) * std::cos(pitch));
         math::Mat4 view = math::Mat4::lookAt(cam_pos, cam_pos + forward_vec, {0, 1, 0});
         math::Mat4 proj = math::Mat4::perspective(1.0f, (float)display.width()/display.height(), 0.1f, 200.0f);
@@ -196,6 +227,10 @@ int main() {
             }
         }
 
+        /*
+         * MESH EVALUATION
+         * Hot-swaps vertex logic based on the active AST from the math parser.
+         */
         if (current_preset == "plane" && plot_mode == PlotMode::Line) {
             // High-res 1D line plotter in 3D space
             auto func = math::Parser::parse(active_formula);
@@ -250,7 +285,14 @@ int main() {
         display.update();
     }
 
-    display.clear(core::Color::BLACK);
-    display.update();
+        display.clear(core::Color::BLACK);
+        display.update();
+    } // release display object
+
+    /*
+     * ENVIRONMENT RESTORATION
+     * Reverts terminal to standard operating state.
+     */
+    tcsetattr(STDIN_FILENO, TCSANOW, &old_t);
     return 0;
 }

@@ -1,3 +1,9 @@
+/*
+ * MESH DEFINITION REGISTRY
+ * A centralized repository of mathematical manifolds. 
+ * Supports hot-swapping of parametric logic and heightmap evaluation.
+ */
+
 #pragma once
 #include "surface.hpp"
 #include <map>
@@ -9,6 +15,7 @@ namespace core {
 
 class MeshLibrary {
 public:
+    // Definition of the parametric search space (u,v domain)
     struct Range { float u_min, u_max, v_min, v_max; };
     using Func = std::function<math::Vec3(float, float, float)>;
 
@@ -41,13 +48,13 @@ private:
     struct Entry { Func f; Range r; };
 
     MeshLibrary() {
-        // Classic Ripple (Heightmap)
+        // Classic Ripple (Radial Sine Wave)
         add_preset("ripple", [](float x, float y, float t) {
             float d = std::sqrt(x*x + y*y);
             return math::Vec3(x, std::sin(d - t * 3.0f) * 2.0f, y);
         }, {-15, 15, -15, 15});
 
-        // Torus (Donut)
+        // Torus (Parametric Ring)
         add_preset("torus", [](float u, float v, float t) {
             float R = 8.0f;
             float r = 3.0f + std::sin(t * 2.0f) * 0.5f;
@@ -58,7 +65,7 @@ private:
             );
         }, {0, 2 * M_PI, 0, 2 * M_PI});
 
-        // Mobius Strip
+        // Mobius Strip (Non-orientable manifold)
         add_preset("mobius", [](float u, float v, float t) {
             float a = 6.0f;
             float x = (a + v/2.0f * std::cos(u/2.0f)) * std::cos(u + t);
@@ -67,7 +74,7 @@ private:
             return math::Vec3(x, y, z);
         }, {0, 2 * M_PI, -3, 3});
 
-        // Klein Bottle (Bagel-like version)
+        // Klein Bottle (Non-orientable topology)
         add_preset("klein", [](float u, float v, float t) {
             float a = 6.0f;
             float x = (a + std::cos(u/2.0f) * std::sin(v) - std::sin(u/2.0f) * std::sin(2.0f*v)) * std::cos(u + t);
@@ -76,14 +83,14 @@ private:
             return math::Vec3(x, y, z);
         }, {0, 2 * M_PI, 0, 2 * M_PI});
 
-        // 3D Coordinate Plane / Sandbox
+        // 3D Coordinate Plane / Sandbox (Identity Projection)
         add_preset("plane", [](float x, float y, float t) {
             // Visualize a flat grid that shows function z = f(x, y, t)
             float z = std::sin(x + t) * std::cos(y + t);
             return math::Vec3(x, z, y);
         }, {-15, 15, -15, 15});
 
-        // "The Beast" - Multi-component complex parametric surface
+        // "The Beast" (Harmonic oscillation manifold)
         add_preset("beast", [](float u, float v, float t) {
             float r = 5.0f * (1.0f + 0.3f * std::sin(8.0f * u + t));
             float x = r * std::cos(u) * std::sin(v);

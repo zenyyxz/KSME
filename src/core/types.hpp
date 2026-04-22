@@ -1,3 +1,9 @@
+/*
+ * CORE ENGINE TYPES
+ * Fundamental data structures and primitive definitions.
+ * Includes 32-bit ARGB color packing for direct framebuffer access.
+ */
+
 #pragma once
 #include <cstdint>
 
