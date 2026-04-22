@@ -1,3 +1,8 @@
+/*
+ * DRM/KMS Display Backend
+ * Handles direct hardware access for flicker-free rendering without a display server.
+ */
+
 #include "drm_display.hpp"
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -29,7 +34,8 @@ DrmDisplay::~DrmDisplay() {
 
 bool DrmDisplay::init_drm() {
     std::cerr << "Initializing DRM..." << std::endl;
-    // 1. Get resources
+    // 1. Resource Discovery
+    // Query the kernel for available connectors (physical ports), encoders, and CRTCs (scanout engines).
     struct drm_mode_card_res res = {};
     if (ioctl(m_fd, DRM_IOCTL_MODE_GETRESOURCES, &res) < 0) {
         std::cerr << "DRM_IOCTL_MODE_GETRESOURCES failed: " << strerror(errno) << std::endl;
@@ -56,7 +62,8 @@ bool DrmDisplay::init_drm() {
         return false;
     }
 
-    // 2. Find a connected connector
+    // 2. Connector Selection
+    // Locate the first physical display that is connected and has valid video modes.
     bool found_conn = false;
     for (uint32_t i = 0; i < res.count_connectors; ++i) {
         struct drm_mode_get_connector conn = {};
@@ -97,7 +104,8 @@ bool DrmDisplay::init_drm() {
         return false;
     }
 
-    // 3. Find CRTC
+    // 3. Encoder and CRTC Routing
+    // Map the selected connector to a hardware pipeline (CRTC).
     if (m_encoder_id == 0) {
         // If no encoder is attached, try the first one supported by the connector
         struct drm_mode_get_connector conn = {};
@@ -129,7 +137,8 @@ bool DrmDisplay::init_drm() {
         return false;
     }
 
-    // 4. Create Buffers
+    // 4. Memory-Mapped Buffer Creation
+    // Allocate dual dumb buffers for software double-buffering.
     create_buffer(m_buffers[0]);
     create_buffer(m_buffers[1]);
     if (m_buffers[0].map == nullptr || m_buffers[1].map == nullptr) {
@@ -137,12 +146,14 @@ bool DrmDisplay::init_drm() {
         return false;
     }
 
-    // 5. Become Master
+    // 5. Acquisition of DRM Master
+    // Request exclusive control of the graphics hardware.
     if (ioctl(m_fd, DRM_IOCTL_SET_MASTER, 0) < 0) {
         std::cerr << "DRM_IOCTL_SET_MASTER failed: " << strerror(errno) << " (Check if another display manager is running)" << std::endl;
     }
 
     // 6. Initial Mode Set
+    // Commit the hardware configuration and initialize the primary plane.
     struct drm_mode_crtc set_crtc = {};
     set_crtc.crtc_id = m_crtc_id;
     set_crtc.fb_id = m_buffers[0].fb_id;
@@ -204,6 +215,11 @@ void DrmDisplay::create_buffer(Buffer& buf) {
 }
 
 void DrmDisplay::update() {
+    /*
+     * Hardware Page Flipping
+     * Schedules a flip to the backbuffer on the next VBlank interval.
+     * Synchronizes the engine to the physical refresh rate of the monitor.
+     */
     struct drm_mode_crtc_page_flip flip = {};
     flip.crtc_id = m_crtc_id;
     flip.fb_id = m_buffers[m_back_idx].fb_id;
@@ -213,9 +229,9 @@ void DrmDisplay::update() {
         m_active_fb_id = m_buffers[m_back_idx].fb_id;
         m_back_idx = (m_back_idx + 1) % 2;
 
-        // Wait for the flip event to sync with the refresh rate
-        struct pollfd pfd = { .fd = m_fd, .events = POLLIN };
-        if (poll(&pfd, 1, 100) > 0) { // 100ms timeout
+        // Wait for the flip event with a 100ms safety timeout to prevent kernel hangs
+        struct pollfd pfd = { .fd = m_fd, .events = POLLIN, .revents = 0 };
+        if (poll(&pfd, 1, 100) > 0) { 
             uint8_t buffer[1024];
             int len;
             while ((len = read(m_fd, buffer, sizeof(buffer))) < 0) {
@@ -223,7 +239,7 @@ void DrmDisplay::update() {
             }
         }
     } else {
-        // Fallback to SETCRTC if Page Flip is not supported or busy
+        // Fallback: Immediate mode set if atomic page flipping is unavailable
         struct drm_mode_crtc set_crtc = {};
         set_crtc.crtc_id = m_crtc_id;
         set_crtc.fb_id = m_buffers[m_back_idx].fb_id;
@@ -237,7 +253,7 @@ void DrmDisplay::update() {
             m_back_idx = (m_back_idx + 1) % 2;
         }
 
-        // Prevent 'too fast' execution when falling back
+        // Throttling to prevent CPU saturation in fallback mode
         usleep(1000); 
     }
 }

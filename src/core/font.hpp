@@ -21,6 +21,20 @@ public:
         }
     }
 
+    template<typename T>
+    static void draw_box(T& fb, int x, int y, int w, int h, uint32_t color, const std::string& title = "") {
+        // Border
+        fb.draw_line(x, y, x + w, y, color);
+        fb.draw_line(x + w, y, x + w, y + h, color);
+        fb.draw_line(x + w, y + h, x, y + h, color);
+        fb.draw_line(x, y + h, x, y, color);
+        
+        // Title if any
+        if (!title.empty()) {
+            draw_text(fb, x + 10, y - 10, " " + title + " ", color, 2);
+        }
+    }
+
 private:
     template<typename T>
     static void draw_char(T& fb, int x, int y, char c, uint32_t color, int scale) {
@@ -71,6 +85,13 @@ private:
             case 'X': draw_line(0,0,4,6); draw_line(4,0,0,6); break;
             case 'Y': draw_line(0,0,2,3); draw_line(4,0,2,3); draw_line(2,3,2,6); break;
             case 'Z': draw_line(0,0,4,0); draw_line(4,0,0,6); draw_line(0,6,4,6); break;
+            case '(': draw_line(3,0,1,2); draw_line(1,2,1,4); draw_line(1,4,3,6); break;
+            case ')': draw_line(1,0,3,2); draw_line(3,2,3,4); draw_line(3,4,1,6); break;
+            case '*': draw_line(0,3,4,3); draw_line(2,1,2,5); draw_line(0,1,4,5); draw_line(4,1,0,5); break;
+            case '+': draw_line(0,3,4,3); draw_line(2,1,2,5); break;
+            case '/': draw_line(4,0,0,6); break;
+            case '^': draw_line(0,3,2,0); draw_line(2,0,4,3); break;
+            case '_': draw_line(0,6,4,6); break;
             case ' ': break;
             default: draw_line(1,3,3,3); break; // Dash for unknown
         }

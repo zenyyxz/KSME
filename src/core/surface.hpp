@@ -21,9 +21,10 @@ public:
     }
 
     // Parametric update: func(u, v) -> Vec3(x, y, z)
+    // Generates a discrete grid of points based on a mathematical mapping.
     void update(std::function<math::Vec3(float, float)> func, 
                 float u_min, float u_max, float v_min, float v_max, float time) {
-        // 1. Calculate world positions
+        // 1. Position Sampling
         for (int j = 0; j < m_rv; ++j) {
             float fv = v_min + (float)j / (m_rv - 1) * (v_max - v_min);
             for (int i = 0; i < m_ru; ++i) {
@@ -32,15 +33,16 @@ public:
             }
         }
 
-        // 2. Calculate normals and colors with dynamic lighting
-        // Rotating light source for dynamic shadows
+        // 2. Vertex Shading (Normals & Lighting)
+        // Light source orbits the scene origin.
         math::Vec3 light_dir = math::Vec3(std::cos(time), 1.0f, std::sin(time)).normalize();
         
         for (int j = 0; j < m_rv; ++j) {
             for (int i = 0; i < m_ru; ++i) {
                 auto& p = m_points[j * m_ru + i];
                 
-                // Better normal estimation using central differences where possible
+                // Normal estimation using Central Differences
+                // Approximates the cross product of the surface tangent vectors.
                 math::Vec3 v_u, v_v;
                 if (i < m_ru - 1) v_u = m_points[j * m_ru + i + 1].world - p.world;
                 else v_u = p.world - m_points[j * m_ru + i - 1].world;
@@ -50,13 +52,14 @@ public:
                 
                 math::Vec3 normal = v_u.cross(v_v).normalize();
 
-                // Two-sided lighting (more visible wireframes)
+                // Two-sided Lambertian shading with high ambient floor
                 float dot = std::abs(normal.dot(light_dir));
-                float intensity = 0.3f + 0.7f * dot; // Higher ambient
+                float intensity = 0.3f + 0.7f * dot; 
 
-                // Enhanced color mapping: mix height and radial distance
+                // Dynamic Procedural Color Mapping
+                // Blends height, radial distance, and temporal oscillation.
                 float dist = p.world.length() * 0.1f;
-                float h = (p.world.y + 4.0f) * 0.15f; // Scale height for better range
+                float h = (p.world.y + 4.0f) * 0.15f; 
                 
                 float factor = std::sin(h + dist + time) * 0.5f + 0.5f;
                 

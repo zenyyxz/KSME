@@ -31,6 +31,12 @@ public:
         return {-10, 10, -10, 10};
     }
 
+    void update_preset(const std::string& name, Func f) {
+        if (m_presets.count(name)) {
+            m_presets[name].f = f;
+        }
+    }
+
 private:
     struct Entry { Func f; Range r; };
 
