@@ -9,8 +9,11 @@
 #include <cmath>
 
 int main() {
-    core::DrmDisplay display("/dev/dri/card0");
-    if (!display.is_valid()) return 1;
+    core::DrmDisplay display("/dev/dri/card1");
+    if (!display.is_valid()) {
+        std::cerr << "Error: Could not initialize DRM device /dev/dri/card1." << std::endl;
+        return 1;
+    }
 
     input::InputManager input;
     core::Surface surface(60, 60); 
